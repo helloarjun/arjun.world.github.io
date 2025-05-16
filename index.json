@@ -1,1 +1,3 @@
-eyJ0ZXN0IjpbeyJpZCI6MTIzNDU2Nzg5MCwidHlwZSI6InRlc3QiLCJwYXRoIjoidGVzdC90ZXN0LWZpbGUuanNvbiIsInRleHQiOiJUZXN0IGRhdGEiLCJ0aW1lc3RhbXAiOiIyMDI1LTA1LTE2VDAwOjAwOjAwLjAwMFoifV19
+[
+  {"id":1234567890,"type":"test","path":"test/test-file.json","text":"Test data","timestamp":"2025-05-16T00:00:00.000Z"}
+]
