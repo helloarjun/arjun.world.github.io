@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Telegram-Powered Website</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .image-card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .image-card img {
+      width: 100%;
+      height: auto;
+    }
+    .image-caption {
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>My Telegram-Powered Website</h1>
+  <div class="image-grid" id="imageContainer">
+    <!-- Images will be loaded here -->
+  </div>
+  
+  <script>
+    // This will load your image data
+    fetch('images.json')
+      .then(response => response.json())
+      .then(data => {
+        const container = document.getElementById('imageContainer');
+        
+        data.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'image-card';
+          
+          const img = document.createElement('img');
+          img.src = 'images/' + item.filename;
+          card.appendChild(img);
+          
+          if (item.caption) {
+            const caption = document.createElement('div');
+            caption.className = 'image-caption';
+            caption.textContent = item.caption;
+            card.appendChild(caption);
+          }
+          
+          container.appendChild(card);
+        });
+      });
+  </script>
+</body>
+</html>
