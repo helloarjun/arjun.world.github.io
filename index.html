@@ -43,14 +43,26 @@
       color: #0000EE;
     }
     
-    .reply-container {
-      margin-left: 20px;
-      border-left: 1px solid #eee;
-      padding-left: 15px;
+    .error {
+      color: #c92a2a;
+      background: #fff5f5;
+      padding: 15px;
+      border-radius: 4px;
+      border: 1px solid #ffc9c9;
     }
     
     .loading {
       padding: 20px 0;
+    }
+
+    .debug-info {
+      margin-top: 40px;
+      font-family: monospace;
+      font-size: 12px;
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
     }
   </style>
 </head>
@@ -64,146 +76,39 @@
     <div class="loading">Loading content...</div>
   </div>
 
+  <div id="debug" class="debug-info"></div>
+
   <script>
-    async function loadPosts() {
-      try {
-        const contentDiv = document.getElementById('content');
-        
-        // Fetch the index file
-        const response = await fetch('index.json');
-        if (!response.ok) {
-          throw new Error('Failed to load posts');
-        }
-        
-        const posts = await response.json();
-        contentDiv.innerHTML = '';
-        
-        if (posts.length === 0) {
-          contentDiv.innerHTML = '<div class="post">No posts yet.</div>';
-          return;
-        }
-        
-        // Organize posts and replies
-        const postsMap = new Map();
-        const repliesMap = new Map();
-        
-        posts.forEach(post => {
-          if (post.isReply && post.replyToId) {
-            if (!repliesMap.has(post.replyToId)) {
-              repliesMap.set(post.replyToId, []);
-            }
-            repliesMap.get(post.replyToId).push(post);
-          } else {
-            postsMap.set(post.id, post);
-          }
-        });
-        
-        // Display all posts with their replies
-        posts.forEach(post => {
-          // Only process main posts (non-replies) here
-          if (!post.isReply) {
-            const postDiv = document.createElement('div');
-            postDiv.className = 'post';
-            postDiv.id = `post-${post.id}`;
-            
-            if (post.type === 'image') {
-              const img = document.createElement('img');
-              img.src = post.path;
-              img.alt = post.text || '';
-              postDiv.appendChild(img);
-              
-              if (post.text) {
-                const caption = document.createElement('p');
-                caption.textContent = post.text;
-                postDiv.appendChild(caption);
-              }
-            } else if (post.type === 'text' || post.type === 'link') {
-              fetch(post.path)
-                .then(response => response.json())
-                .then(postData => {
-                  const textDiv = document.createElement('div');
-                  textDiv.className = 'post-text';
-                  
-                  if (postData.containsLinks) {
-                    let content = postData.content;
-                    const urlRegex = /(https?:\/\/[^\s]+)/g;
-                    content = content.replace(urlRegex, url => 
-                      `<a href="${url}" target="_blank">${url}</a>`
-                    );
-                    textDiv.innerHTML = content;
-                  } else {
-                    textDiv.textContent = postData.content;
-                  }
-                  
-                  postDiv.appendChild(textDiv);
-                })
-                .catch(error => {
-                  console.error('Error loading post:', error);
-                });
-            }
-            
-            contentDiv.appendChild(postDiv);
-            
-            // Add replies if any
-            if (repliesMap.has(post.id)) {
-              const repliesDiv = document.createElement('div');
-              repliesDiv.className = 'reply-container';
-              
-              repliesMap.get(post.id).forEach(reply => {
-                const replyDiv = document.createElement('div');
-                replyDiv.className = 'post';
-                
-                if (reply.type === 'image') {
-                  const img = document.createElement('img');
-                  img.src = reply.path;
-                  img.alt = reply.text || '';
-                  replyDiv.appendChild(img);
-                  
-                  if (reply.text) {
-                    const caption = document.createElement('p');
-                    caption.textContent = reply.text;
-                    replyDiv.appendChild(caption);
-                  }
-                } else if (reply.type === 'text' || reply.type === 'link') {
-                  fetch(reply.path)
-                    .then(response => response.json())
-                    .then(replyData => {
-                      const textDiv = document.createElement('div');
-                      textDiv.className = 'post-text';
-                      
-                      if (replyData.containsLinks) {
-                        let content = replyData.content;
-                        const urlRegex = /(https?:\/\/[^\s]+)/g;
-                        content = content.replace(urlRegex, url => 
-                          `<a href="${url}" target="_blank">${url}</a>`
-                        );
-                        textDiv.innerHTML = content;
-                      } else {
-                        textDiv.textContent = replyData.content;
-                      }
-                      
-                      replyDiv.appendChild(textDiv);
-                    })
-                    .catch(error => {
-                      console.error('Error loading reply:', error);
-                    });
-                }
-                
-                repliesDiv.appendChild(replyDiv);
-              });
-              
-              postDiv.appendChild(repliesDiv);
-            }
-          }
-        });
-      } catch (error) {
-        console.error('Error loading posts:', error);
-        document.getElementById('content').innerHTML = 'Error loading content.';
-      }
+    const debugEl = document.getElementById('debug');
+    
+    function showDebug(message) {
+      debugEl.style.display = 'block';
+      debugEl.innerHTML += message + '<br>';
     }
     
-    // Load posts when page loads
-    document.addEventListener('DOMContentLoaded', loadPosts);
-  </script>
-</body>
-</html>
+    async function loadPosts() {
+      const contentDiv = document.getElementById('content');
+      
+      try {
+        showDebug('Fetching index.json');
+        // Fetch the index file with cache-busting query parameter
+        const response = await fetch('index.json?t=' + new Date().getTime());
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load posts: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.text();
+        showDebug('Received data: ' + data.substring(0, 100) + '...');
+        
+        // Try to parse the JSON
+        let posts;
+        try {
+          posts = JSON.parse(data);
+        } catch (parseError) {
+          showDebug('JSON parse error: ' + parseError.message);
+          throw new Error('Invalid JSON format in index.json');
+        }
+        
+        if (!Array.isArray(posts)) {
+          showDebug('Expected
