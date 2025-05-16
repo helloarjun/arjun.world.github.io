@@ -1,3 +1,9 @@
 [
-  {"id":1234567890,"type":"test","path":"test/test-file.json","text":"Test data","timestamp":"2025-05-16T00:00:00.000Z"}
+  {
+    "id": 1234567890,
+    "type": "text",
+    "path": "test/test-file.json",
+    "text": "This is a test post",
+    "timestamp": "2025-05-16T00:00:00.000Z"
+  }
 ]
