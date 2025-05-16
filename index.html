@@ -1,114 +1,93 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>arjun.world</title>
+  <meta charset="UTF-8">
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-      line-height: 1.5;
-      color: #333;
-    }
-    
-    header {
-      margin-bottom: 25px;
-    }
-    
-    header p {
-      color: #555;
-      max-width: 600px;
-    }
-    
-    img {
-      max-width: 100%;
-      height: auto;
-      margin-bottom: 20px;
-      display: block;
-    }
-    
-    .post {
-      margin-bottom: 40px;
-    }
-    
-    .post-text {
-      margin-top: 0;
-      margin-bottom: 25px;
-    }
-    
-    a {
-      color: #0000EE;
-    }
-    
-    .error {
-      color: #c92a2a;
-      background: #fff5f5;
-      padding: 15px;
-      border-radius: 4px;
-      border: 1px solid #ffc9c9;
-    }
-    
-    .loading {
-      padding: 20px 0;
-    }
-
-    .debug-info {
-      margin-top: 40px;
-      font-family: monospace;
-      font-size: 12px;
-      background: #f5f5f5;
-      padding: 10px;
-      border-radius: 4px;
-      display: none;
-    }
+    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .error { color: red; background: #fff0f0; padding: 10px; border: 1px solid #ffd0d0; }
+    .debug { background: #f0f0f0; padding: 10px; font-family: monospace; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <header>
-    <h3>arjun.world</h3>
-    <p>This contains miscellaneous screenshots, links, quotes, and videos. I suppose in some sense it functions as a public blog.</p>
-  </header>
+  <h1>arjun.world</h1>
+  <p>This contains miscellaneous screenshots, links, quotes, and videos. I suppose in some sense it functions as a public blog.</p>
   
-  <div id="content">
-    <div class="loading">Loading content...</div>
-  </div>
-
-  <div id="debug" class="debug-info"></div>
-
+  <button onclick="loadContent()">Reload Content</button>
+  <div id="debug" class="debug"></div>
+  <div id="content">Loading content...</div>
+  
   <script>
-    const debugEl = document.getElementById('debug');
-    
-    function showDebug(message) {
-      debugEl.style.display = 'block';
-      debugEl.innerHTML += message + '<br>';
+    // Show debug info directly on page
+    function debug(msg) {
+      document.getElementById('debug').textContent += msg + "\n";
     }
     
-    async function loadPosts() {
-      const contentDiv = document.getElementById('content');
+    // Load content with explicit error handling
+    function loadContent() {
+      document.getElementById('debug').textContent = ""; // Clear debug area
+      document.getElementById('content').innerHTML = "Loading content...";
       
-      try {
-        showDebug('Fetching index.json');
-        // Fetch the index file with cache-busting query parameter
-        const response = await fetch('index.json?t=' + new Date().getTime());
-        
-        if (!response.ok) {
-          throw new Error(`Failed to load posts: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.text();
-        showDebug('Received data: ' + data.substring(0, 100) + '...');
-        
-        // Try to parse the JSON
-        let posts;
-        try {
-          posts = JSON.parse(data);
-        } catch (parseError) {
-          showDebug('JSON parse error: ' + parseError.message);
-          throw new Error('Invalid JSON format in index.json');
-        }
-        
-        if (!Array.isArray(posts)) {
-          showDebug('Expected
+      debug("Starting content load at " + new Date().toISOString());
+      
+      // Directly fetch the index.json with a cache-busting query
+      fetch('index.json?nocache=' + Date.now())
+        .then(response => {
+          debug("Fetch response status: " + response.status);
+          if (!response.ok) {
+            throw new Error("HTTP error " + response.status);
+          }
+          return response.text();  // Get as text first to debug
+        })
+        .then(text => {
+          debug("Received text (" + text.length + " bytes): " + text.substring(0, 100) + "...");
+          try {
+            return JSON.parse(text);  // Parse the JSON
+          } catch (e) {
+            debug("JSON PARSE ERROR: " + e.message);
+            throw new Error("JSON parse error: " + e.message);
+          }
+        })
+        .then(data => {
+          debug("Parsed JSON: " + JSON.stringify(data).substring(0, 100) + "...");
+          debug("Is array: " + Array.isArray(data));
+          debug("Length: " + (Array.isArray(data) ? data.length : "N/A"));
+          
+          if (!Array.isArray(data) || data.length === 0) {
+            document.getElementById('content').innerHTML = "No posts found. The index.json file doesn't contain a valid array of posts.";
+            return;
+          }
+          
+          // Build HTML for posts
+          let html = "";
+          data.forEach(post => {
+            debug("Processing post: " + JSON.stringify(post).substring(0, 100));
+            html += "<div style='margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;'>";
+            
+            if (post.type === "image") {
+              html += `<img src="${post.path}" style="max-width: 100%;" onerror="this.onerror=null; this.src=''; this.alt='Image failed to load';">`;
+              if (post.text) {
+                html += `<p>${post.text}</p>`;
+              }
+            } else if (post.type === "text" || post.type === "link") {
+              html += `<p>${post.text || "No text available"}</p>`;
+            } else {
+              html += `<p>Unknown post type: ${post.type}</p>`;
+            }
+            
+            html += "</div>";
+          });
+          
+          document.getElementById('content').innerHTML = html;
+        })
+        .catch(error => {
+          debug("ERROR: " + error.message);
+          document.getElementById('content').innerHTML = `<div class="error">Error loading content: ${error.message}</div>`;
+        });
+    }
+    
+    // Load content when page loads
+    window.onload = loadContent;
+  </script>
+</body>
+</html>
