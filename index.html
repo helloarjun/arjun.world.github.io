@@ -3,10 +3,73 @@
 <head>
   <title>arjun.world</title>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-    .error { color: red; background: #fff0f0; padding: 10px; border: 1px solid #ffd0d0; }
-    .debug { background: #f0f0f0; padding: 10px; font-family: monospace; white-space: pre-wrap; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 20px;
+      line-height: 1.6;
+      color: #333;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    p {
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      display: block;
+    }
+    .post {
+      margin-bottom: 30px;
+      padding-bottom: 30px;
+      border-bottom: 1px solid #eee;
+    }
+    .error { 
+      color: #c92a2a; 
+      background: #fff5f5; 
+      padding: 10px; 
+      border: 1px solid #ffc9c9;
+      border-radius: 4px;
+    }
+    .debug { 
+      background: #f5f5f5; 
+      padding: 10px; 
+      font-family: monospace; 
+      white-space: pre-wrap;
+      font-size: 12px;
+      margin: 20px 0;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    button {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #e5e5e5;
+    }
+    a {
+      color: #0070f3;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -20,7 +83,11 @@
   <script>
     // Show debug info directly on page
     function debug(msg) {
-      document.getElementById('debug').textContent += msg + "\n";
+      const debugEl = document.getElementById('debug');
+      debugEl.textContent += msg + "\n";
+      
+      // Auto-scroll to bottom of debug area
+      debugEl.scrollTop = debugEl.scrollHeight;
     }
     
     // Load content with explicit error handling
@@ -62,17 +129,38 @@
           let html = "";
           data.forEach(post => {
             debug("Processing post: " + JSON.stringify(post).substring(0, 100));
-            html += "<div style='margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;'>";
+            html += `<div class="post">`;
             
+            // Handle different content types
             if (post.type === "image") {
-              html += `<img src="${post.path}" style="max-width: 100%;" onerror="this.onerror=null; this.src=''; this.alt='Image failed to load';">`;
+              // Image post
+              html += `<img src="${post.path}" alt="${post.text || ''}" onerror="this.onerror=null; this.after(document.createTextNode('[Image failed to load]'));">`;
               if (post.text) {
                 html += `<p>${post.text}</p>`;
               }
-            } else if (post.type === "text" || post.type === "link") {
-              html += `<p>${post.text || "No text available"}</p>`;
+            } else if (post.type === "text" || post.type === "link" || post.type === "test") {
+              // Text or link post - fetch the content file
+              if (post.path && post.path.endsWith('.json')) {
+                // Create a placeholder that will be filled when content loads
+                html += `<div id="post-${post.id}" data-path="${post.path}">
+                  <p>${post.text || "Loading content..."}</p>
+                </div>`;
+                
+                // We'll load these after rendering the basic page
+                setTimeout(() => loadPostContent(post.path, post.id), 100);
+              } else {
+                // Just show the text if no path to load content from
+                html += `<p>${post.text || "No text available"}</p>`;
+              }
             } else {
-              html += `<p>Unknown post type: ${post.type}</p>`;
+              // Unknown post type
+              html += `<p>${post.text || "Content: " + post.type}</p>`;
+            }
+            
+            // Add timestamp if available
+            if (post.timestamp) {
+              const date = new Date(post.timestamp);
+              html += `<div style="color: #666; font-size: 12px;">${date.toLocaleString()}</div>`;
             }
             
             html += "</div>";
@@ -83,6 +171,53 @@
         .catch(error => {
           debug("ERROR: " + error.message);
           document.getElementById('content').innerHTML = `<div class="error">Error loading content: ${error.message}</div>`;
+        });
+    }
+    
+    // Function to load individual post content files
+    function loadPostContent(path, postId) {
+      debug("Loading post content from: " + path);
+      
+      fetch(path)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("HTTP error " + response.status);
+          }
+          return response.json();
+        })
+        .then(postData => {
+          debug("Loaded post data: " + JSON.stringify(postData).substring(0, 100) + "...");
+          
+          const postEl = document.getElementById('post-' + postId);
+          if (!postEl) return;
+          
+          let html = "";
+          
+          // Handle content based on data
+          if (postData.content) {
+            if (postData.containsLinks) {
+              // Replace URLs with clickable links
+              let content = postData.content;
+              const urlRegex = /(https?:\/\/[^\s]+)/g;
+              content = content.replace(urlRegex, url => 
+                `<a href="${url}" target="_blank">${url}</a>`
+              );
+              html = content;
+            } else {
+              html = `<p>${postData.content}</p>`;
+            }
+          } else {
+            html = `<p>${postData.text || "No content available"}</p>`;
+          }
+          
+          postEl.innerHTML = html;
+        })
+        .catch(error => {
+          debug("Error loading post content: " + error.message);
+          const postEl = document.getElementById('post-' + postId);
+          if (postEl) {
+            postEl.innerHTML = `<div class="error">Error loading post content: ${error.message}</div>`;
+          }
         });
     }
     
