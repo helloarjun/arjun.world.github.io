@@ -1,64 +1,209 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>My Telegram-Powered Website</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>arjun.world</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      max-width: 1200px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 800px;
       margin: 0 auto;
       padding: 20px;
+      line-height: 1.5;
+      color: #333;
     }
-    .image-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
+    
+    header {
+      margin-bottom: 25px;
     }
-    .image-card {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
+    
+    header p {
+      color: #555;
+      max-width: 600px;
     }
-    .image-card img {
-      width: 100%;
+    
+    img {
+      max-width: 100%;
       height: auto;
+      margin-bottom: 20px;
+      display: block;
     }
-    .image-caption {
-      padding: 10px;
+    
+    .post {
+      margin-bottom: 40px;
+    }
+    
+    .post-text {
+      margin-top: 0;
+      margin-bottom: 25px;
+    }
+    
+    a {
+      color: #0000EE;
+    }
+    
+    .reply-container {
+      margin-left: 20px;
+      border-left: 1px solid #eee;
+      padding-left: 15px;
+    }
+    
+    .loading {
+      padding: 20px 0;
     }
   </style>
 </head>
 <body>
-  <h1>My Telegram-Powered Website</h1>
-  <div class="image-grid" id="imageContainer">
-    <!-- Images will be loaded here -->
-  </div>
+  <header>
+    <h3>arjun.world</h3>
+    <p>This contains miscellaneous screenshots, links, quotes, and videos. I suppose in some sense it functions as a public blog.</p>
+  </header>
   
+  <div id="content">
+    <div class="loading">Loading content...</div>
+  </div>
+
   <script>
-    // This will load your image data
-    fetch('images.json')
-      .then(response => response.json())
-      .then(data => {
-        const container = document.getElementById('imageContainer');
+    async function loadPosts() {
+      try {
+        const contentDiv = document.getElementById('content');
         
-        data.forEach(item => {
-          const card = document.createElement('div');
-          card.className = 'image-card';
-          
-          const img = document.createElement('img');
-          img.src = 'images/' + item.filename;
-          card.appendChild(img);
-          
-          if (item.caption) {
-            const caption = document.createElement('div');
-            caption.className = 'image-caption';
-            caption.textContent = item.caption;
-            card.appendChild(caption);
+        // Fetch the index file
+        const response = await fetch('index.json');
+        if (!response.ok) {
+          throw new Error('Failed to load posts');
+        }
+        
+        const posts = await response.json();
+        contentDiv.innerHTML = '';
+        
+        if (posts.length === 0) {
+          contentDiv.innerHTML = '<div class="post">No posts yet.</div>';
+          return;
+        }
+        
+        // Organize posts and replies
+        const postsMap = new Map();
+        const repliesMap = new Map();
+        
+        posts.forEach(post => {
+          if (post.isReply && post.replyToId) {
+            if (!repliesMap.has(post.replyToId)) {
+              repliesMap.set(post.replyToId, []);
+            }
+            repliesMap.get(post.replyToId).push(post);
+          } else {
+            postsMap.set(post.id, post);
           }
-          
-          container.appendChild(card);
         });
-      });
+        
+        // Display all posts with their replies
+        posts.forEach(post => {
+          // Only process main posts (non-replies) here
+          if (!post.isReply) {
+            const postDiv = document.createElement('div');
+            postDiv.className = 'post';
+            postDiv.id = `post-${post.id}`;
+            
+            if (post.type === 'image') {
+              const img = document.createElement('img');
+              img.src = post.path;
+              img.alt = post.text || '';
+              postDiv.appendChild(img);
+              
+              if (post.text) {
+                const caption = document.createElement('p');
+                caption.textContent = post.text;
+                postDiv.appendChild(caption);
+              }
+            } else if (post.type === 'text' || post.type === 'link') {
+              fetch(post.path)
+                .then(response => response.json())
+                .then(postData => {
+                  const textDiv = document.createElement('div');
+                  textDiv.className = 'post-text';
+                  
+                  if (postData.containsLinks) {
+                    let content = postData.content;
+                    const urlRegex = /(https?:\/\/[^\s]+)/g;
+                    content = content.replace(urlRegex, url => 
+                      `<a href="${url}" target="_blank">${url}</a>`
+                    );
+                    textDiv.innerHTML = content;
+                  } else {
+                    textDiv.textContent = postData.content;
+                  }
+                  
+                  postDiv.appendChild(textDiv);
+                })
+                .catch(error => {
+                  console.error('Error loading post:', error);
+                });
+            }
+            
+            contentDiv.appendChild(postDiv);
+            
+            // Add replies if any
+            if (repliesMap.has(post.id)) {
+              const repliesDiv = document.createElement('div');
+              repliesDiv.className = 'reply-container';
+              
+              repliesMap.get(post.id).forEach(reply => {
+                const replyDiv = document.createElement('div');
+                replyDiv.className = 'post';
+                
+                if (reply.type === 'image') {
+                  const img = document.createElement('img');
+                  img.src = reply.path;
+                  img.alt = reply.text || '';
+                  replyDiv.appendChild(img);
+                  
+                  if (reply.text) {
+                    const caption = document.createElement('p');
+                    caption.textContent = reply.text;
+                    replyDiv.appendChild(caption);
+                  }
+                } else if (reply.type === 'text' || reply.type === 'link') {
+                  fetch(reply.path)
+                    .then(response => response.json())
+                    .then(replyData => {
+                      const textDiv = document.createElement('div');
+                      textDiv.className = 'post-text';
+                      
+                      if (replyData.containsLinks) {
+                        let content = replyData.content;
+                        const urlRegex = /(https?:\/\/[^\s]+)/g;
+                        content = content.replace(urlRegex, url => 
+                          `<a href="${url}" target="_blank">${url}</a>`
+                        );
+                        textDiv.innerHTML = content;
+                      } else {
+                        textDiv.textContent = replyData.content;
+                      }
+                      
+                      replyDiv.appendChild(textDiv);
+                    })
+                    .catch(error => {
+                      console.error('Error loading reply:', error);
+                    });
+                }
+                
+                repliesDiv.appendChild(replyDiv);
+              });
+              
+              postDiv.appendChild(repliesDiv);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error loading posts:', error);
+        document.getElementById('content').innerHTML = 'Error loading content.';
+      }
+    }
+    
+    // Load posts when page loads
+    document.addEventListener('DOMContentLoaded', loadPosts);
   </script>
 </body>
 </html>
